@@ -1,7 +1,10 @@
-const router = require("express").Router();
-const Movement = require("../models/Movement");
+import { Request, Response, Router } from "express";
+import { iRequestQuery } from "../types";
+import Movement from "../models/Movement";
 
-router.post("/", async (req, res) => {
+const router = Router();
+
+router.post("/", async (req: Request, res: Response) => {
   const { title, value, type } = req.body;
   const movement = new Movement({
     title: title,
@@ -17,40 +20,53 @@ router.post("/", async (req, res) => {
   } catch (err) {
     res.json({
       sucess: false,
-      mensage: err,
+      error: err,
     });
   }
 });
 
-router.get("/", async (req, res) => {
-  const movement = await Movement.find();
+router.get("/", async (req: iRequestQuery, res: Response) => {
+  const { startDate, endDate, page = 1, limit = 10 } = req.query;
+
+  const movement = await Movement.find()
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .exec();
+
+  const count = await Movement.countDocuments();
+
   try {
     res.json({
       sucess: true,
       data: movement,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
     });
   } catch (err) {
     res.json({
       sucess: false,
-      menssage: err,
+      error: err,
     });
   }
 });
 
-router.get("/balance", async (req, res) => {
-  const movement = await Movement.find();
-  const entries = movement
-    .filter((m) => m.type === "E")
-    .reduce((sum, m) => sum + m.value, 0);
-  const exits = movement
-    .filter((m) => m.type === "S")
-    .reduce((sum, m) => sum + m.value, 0);
+router.get("/balance", async (req: Request, res: Response) => {
+  const sumEntries = await Movement.aggregate([
+    { $match: { type: "S" } },
+    { $group: { _id: null, sum: { $sum: "$value" } } },
+  ]);
 
-  const total = entries - exits;
+  const sumExits = await Movement.aggregate([
+    { $match: { type: "E" } },
+    { $group: { _id: null, sum: { $sum: "$value" } } },
+  ]);
+
+  const total = sumEntries[0].sum - sumExits[0].sum;
+
   try {
     res.json({
       sucess: true,
-      data: total,
+      balance: total,
     });
   } catch (err) {
     res.json({
@@ -60,7 +76,7 @@ router.get("/balance", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req: Request, res: Response) => {
   const { id: _id } = req.params;
   const { title, value, type } = req.body;
 
@@ -83,7 +99,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req: Request, res: Response) => {
   const { id: _id } = req.params;
 
   try {

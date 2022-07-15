@@ -1,9 +1,11 @@
 const router = require("express").Router();
+
 require("../db/db_connect");
-const controleFinanceiro = require("./controle-financeiro");
+import { Request, Response } from "express";
+import controleFinanceiro from "./controle-financeiro";
 const movement = require("./movement");
 
-router.get("/", (req, res) => {
+router.get("/", (req: Request, res: Response) => {
   res.json({
     sucess: false,
     message: "/api dedicada ao servidor",
